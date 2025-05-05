@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Музыкальный Визуализатор</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Базовые стили для body и html для корректного отображения */
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: 'Inter', sans-serif; /* Используем шрифт Inter */
+            background-color: #1a1a1a; /* Темный фон */
+            color: #e0e0e0; /* Светлый текст */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        /* Стили для canvas */
+        canvas {
+            display: block;
+            background-color: #2a2a2a; /* Чуть светлее фон для canvas */
+            border-radius: 8px; /* Скругленные углы */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); /* Тень */
+        }
+        /* Стили для контейнера управления */
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px; /* Расстояние между элементами */
+        }
+        /* Стили для инпута файла */
+        input[type="file"] {
+            background-color: #3a3a3a;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        input[type="file"]::file-selector-button {
+            background-color: #4f46e5; /* Фиолетовый цвет Tailwind */
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-right: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background-color: #4338ca; /* Темнее при наведении */
+        }
+        input[type="file"]:hover {
+            background-color: #4a4a4a;
+        }
+        /* Стили для информационного сообщения */
+        #infoMessage {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #a0a0a0;
+        }
+        /* Стили для сообщения об ошибке */
+        #errorMessage {
+            margin-top: 10px;
+            color: #ef4444; /* Красный цвет Tailwind */
+            font-weight: bold;
+            display: none; /* Скрыто по умолчанию */
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-gray-200 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <h1 class="text-3xl font-bold mb-6 text-indigo-400">Музыкальный Визуализатор</h1>
+
+    <canvas id="visualizerCanvas" class="rounded-lg shadow-lg"></canvas>
+
+    <div id="controls" class="mt-6 flex flex-col items-center gap-4">
+        <label for="audioFile" class="block text-sm font-medium text-gray-400">Загрузите аудиофайл:</label>
+        <input type="file" id="audioFile" accept="audio/*" class="block w-full max-w-xs text-sm text-gray-300 bg-gray-700 border border-gray-600 rounded-lg cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+        <p id="infoMessage" class="text-xs text-gray-500">Воспроизведение начнется автоматически после выбора файла.</p>
+        <p id="errorMessage" class="text-sm text-red-500 font-semibold hidden">Произошла ошибка. Попробуйте другой файл или браузер.</p>
+    </div>
+
+    <audio id="audioPlayer" controls class="hidden"></audio>
+
+    <script>
+        // Получаем ссылки на элементы DOM
+        const canvas = document.getElementById('visualizerCanvas');
+        const ctx = canvas.getContext('2d');
+        const audioFileInput = document.getElementById('audioFile');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const infoMessage = document.getElementById('infoMessage');
+        const errorMessage = document.getElementById('errorMessage');
+
+        let audioContext; // Контекст Web Audio API
+        let analyser; // Узел анализатора
+        let source; // Источник аудио
+        let dataArray; // Массив для данных частот
+        let bufferLength; // Размер буфера данных
+        let animationFrameId; // ID для requestAnimationFrame
+
+        // Флаг, инициализирован ли аудио контекст
+        let isAudioContextInitialized = false;
+
+        // Функция для инициализации Web Audio API (вызывается после взаимодействия пользователя)
+        function initializeAudioContext() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                // Настройка анализатора
+                analyser.fftSize = 256; // Размер FFT (степень двойки, влияет на детализацию)
+                bufferLength = analyser.frequencyBinCount; // Количество "столбцов" данных (fftSize / 2)
+                dataArray = new Uint8Array(bufferLength); // Массив для хранения данных частот (0-255)
+
+                // Создаем источник из audio элемента ТОЛЬКО ПОСЛЕ ЗАГРУЗКИ ФАЙЛА
+                // source = audioContext.createMediaElementSource(audioPlayer); // Делаем это в file change handler
+
+                // Подключаем узлы: источник -> анализатор -> выход (динамики)
+                // source.connect(analyser); // Делаем это в file change handler
+                analyser.connect(audioContext.destination);
+
+                isAudioContextInitialized = true;
+                errorMessage.classList.add('hidden'); // Скрыть сообщение об ошибке, если было
+                console.log("AudioContext initialized successfully.");
+            } catch (e) {
+                console.error("Error initializing Web Audio API:", e);
+                errorMessage.textContent = "Ваш браузер не поддерживает Web Audio API.";
+                errorMessage.classList.remove('hidden');
+            }
+        }
+
+        // Функция для настройки размеров Canvas
+        function setupCanvas() {
+            // Устанавливаем размер canvas (можно сделать адаптивным)
+            const container = document.body; // Или другой родительский контейнер
+            const maxWidth = 800;
+            const maxHeight = 300;
+            const aspectRatio = maxWidth / maxHeight;
+
+            let newWidth = Math.min(container.clientWidth * 0.9, maxWidth);
+            let newHeight = newWidth / aspectRatio;
+
+            if (newHeight > container.clientHeight * 0.6) {
+                 newHeight = container.clientHeight * 0.6;
+                 newWidth = newHeight * aspectRatio;
+            }
+
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            console.log(`Canvas resized to: ${canvas.width}x${canvas.height}`);
+        }
+
+        // Функция отрисовки визуализации
+        function draw() {
+            // Запрашиваем следующий кадр анимации
+            animationFrameId = requestAnimationFrame(draw);
+
+            if (!analyser) return; // Выход, если анализатор еще не создан
+
+            // Получаем данные о частотах в текущий момент времени
+            analyser.getByteFrequencyData(dataArray);
+
+            // Очищаем холст перед рисованием нового кадра
+            ctx.fillStyle = '#2a2a2a'; // Цвет фона холста
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const barWidth = (canvas.width / bufferLength) * 1.5; // Ширина одного столбца (с небольшим перекрытием)
+            let barHeight;
+            let x = 0; // Начальная позиция X для первого столбца
+
+            // Проходим по всем данным частот и рисуем столбцы
+            for (let i = 0; i < bufferLength; i++) {
+                // Высота столбца пропорциональна значению частоты (0-255)
+                barHeight = (dataArray[i] / 255) * canvas.height * 0.9; // Масштабируем высоту
+
+                // Задаем цвет столбца (можно сделать градиент или менять цвет)
+                 // Градиент от фиолетового к бирюзовому
+                const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
+                gradient.addColorStop(0, '#6366f1'); // Indigo-500
+                gradient.addColorStop(1, '#2dd4bf'); // Teal-400
+                ctx.fillStyle = gradient;
+
+                // Рисуем столбец
+                ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+                // Сдвигаем позицию X для следующего столбца
+                x += barWidth + 1; // Добавляем 1 пиксель отступа между столбцами
+            }
+        }
+
+        // Обработчик события выбора файла
+        audioFileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                // Инициализируем AudioContext при первом взаимодействии
+                if (!isAudioContextInitialized) {
+                    initializeAudioContext();
+                }
+
+                // Если инициализация не удалась, выходим
+                if (!isAudioContextInitialized) return;
+
+                // Создаем URL для выбранного файла
+                const objectURL = URL.createObjectURL(file);
+                audioPlayer.src = objectURL;
+
+                // Важно: Создаем источник ПОСЛЕ установки src и инициализации AudioContext
+                if (!source) { // Создаем источник только один раз
+                     try {
+                        source = audioContext.createMediaElementSource(audioPlayer);
+                        source.connect(analyser);
+                        // analyser уже подключен к destination при инициализации
+                        console.log("Audio source connected.");
+                     } catch (e) {
+                         console.error("Error creating or connecting media element source:", e);
+                         errorMessage.textContent = "Не удалось подключить аудиофайл.";
+                         errorMessage.classList.remove('hidden');
+                         return; // Прекращаем выполнение, если не удалось подключить источник
+                     }
+                }
+
+
+                // Начинаем воспроизведение
+                audioPlayer.play().then(() => {
+                    console.log("Audio playback started.");
+                    infoMessage.textContent = `Воспроизводится: ${file.name}`;
+                    errorMessage.classList.add('hidden'); // Скрыть ошибку, если была
+
+                    // Возобновляем аудио контекст, если он был приостановлен
+                     if (audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+
+                    // Отменяем предыдущий цикл анимации, если он был
+                    if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId);
+                    }
+                    // Запускаем цикл отрисовки
+                    draw();
+                }).catch(error => {
+                    console.error("Error playing audio:", error);
+                    errorMessage.textContent = "Не удалось воспроизвести аудиофайл.";
+                    errorMessage.classList.remove('hidden');
+                    infoMessage.textContent = "Выберите другой файл.";
+                     // Останавливаем анимацию, если была ошибка воспроизведения
+                    if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId);
+                    }
+                });
+
+                 // Очищаем URL после того, как он больше не нужен (не обязательно здесь, но хорошая практика)
+                // audioPlayer.onended = () => {
+                //     URL.revokeObjectURL(objectURL);
+                // };
+            }
+        });
+
+        // Обработчик изменения размера окна
+        window.addEventListener('resize', () => {
+             setupCanvas();
+             // Перерисовка не нужна здесь, т.к. draw() вызывается постоянно
+             // Но если бы анимация не шла, нужно было бы вызвать draw() один раз
+        });
+
+        // Первоначальная настройка Canvas при загрузке страницы
+        setupCanvas();
+
+        // Начальное сообщение
+        infoMessage.textContent = "Выберите аудиофайл для начала визуализации.";
+
+    </script>
+
+</body>
+</html>

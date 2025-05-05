@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор QR-кода</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        /* Дополнительные стили для темной темы, центрирования и отступов */
+        body {
+            font-family: "Inter", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1a202c; /* Темно-серый фон */
+            color: #e2e8f0; /* Светлый цвет текста */
+            padding: 1rem; /* Отступ вокруг контента */
+        }
+        #container {
+            background-color: #2d3748; /* Более светлый темно-серый фон контейнера */
+            padding: 2rem; /* Уменьшенный внутренний отступ контейнера для лучшего вписывания */
+            border-radius: 0.75rem; /* Более скругленные углы */
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2); /* Более выраженная тень */
+            text-align: center; /* Выравнивание содержимого по центру */
+            max-width: 380px; /* Уменьшенная максимальная ширина контейнера */
+            width: 100%; /* Ширина контейнера */
+            animation: fadeIn 1s ease-out; /* Анимация появления */
+            box-sizing: border-box; /* Учитываем padding в общей ширине */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #qrcode {
+            margin-top: 1.5rem; /* Отступ сверху для QR-кода */
+            display: flex; /* Использование flexbox для центрирования canvas */
+            justify-content: center; /* Центрирование по горизонтали */
+            align-items: center; /* Центрирование по вертикали */
+            padding: 0.75rem; /* Отступ вокруг QR-кода */
+            background-color: #ffffff; /* Белый фон для QR-кода (контраст) */
+            border-radius: 0.5rem; /* Скругленные углы для области QR-кода */
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1); /* Внутренняя тень */
+            /* Ограничиваем размер контейнера QR-кода, чтобы он не был слишком большим */
+            max-width: 270px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+         #qrcode canvas {
+             /* Стили для canvas внутри элемента с id="qrcode" */
+             /* qrcode.js добавляет canvas или img сюда */
+             /* Убедимся, что canvas не выходит за рамки родителя */
+             max-width: 100%;
+             height: auto;
+        }
+
+        /* Стили для кнопки сохранения */
+        #saveBtn {
+            /* Начальное состояние - скрыта */
+            display: none;
+            margin-top: 1rem; /* Отступ сверху */
+            /* Дополнительные стили для кнопки с эмодзи */
+            font-size: 1.5rem; /* Увеличиваем размер эмодзи */
+            padding: 0.75rem 1.5rem; /* Уменьшаем padding для кнопки с эмодзи */
+            line-height: 1; /* Убираем лишний интерлиньяж */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container" class="space-y-5">
+        <h1 class="text-2xl font-extrabold text-white">Генератор QR-кода</h1>
+
+        <input
+            type="text"
+            id="textInput"
+            placeholder="Введите текст для QR-кода"
+            class="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300 ease-in-out text-sm"
+        >
+
+        <button
+            id="generateBtn"
+            class="w-full bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition duration-300 ease-in-out transform hover:scale-105 text-sm"
+        >
+            Создать QR-код
+        </button>
+
+        <div id="qrcode">
+            </div>
+
+        <button
+            id="saveBtn"
+            class="w-full bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 transition duration-300 ease-in-out transform hover:scale-105"
+            title="Сохранить QR-код" /* Добавляем подсказку при наведении */
+        >
+            ⤵️ </button>
+    </div>
+
+    <script>
+        // Получаем ссылки на элементы DOM
+        const textInput = document.getElementById('textInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const qrcodeDiv = document.getElementById('qrcode');
+        const saveBtn = document.getElementById('saveBtn'); // Получаем кнопку сохранения
+        let qrcodeInstance = null; // Переменная для хранения экземпляра QRCode
+
+        // Функция для генерации QR-кода
+        function generateQrCode() {
+             const textToEncode = textInput.value;
+
+            if (textToEncode) {
+                // Очищаем предыдущий QR-код (если он был)
+                qrcodeDiv.innerHTML = '';
+                qrcodeInstance = null; // Сбрасываем экземпляр
+
+                // Создаем новый экземпляр QRCode
+                // Уменьшаем размеры QR-кода, чтобы лучше вписывался
+                qrcodeInstance = new QRCode(qrcodeDiv, {
+                    text: textToEncode, // Текст для кодирования
+                    width: 200,         // Ширина QR-кода (уменьшена)
+                    height: 200,        // Высота QR-кода (уменьшена)
+                    colorDark : "#000000", // Цвет темных пикселей
+                    colorLight : "#ffffff", // Цвет светлых пикселей
+                    correctLevel : QRCode.CorrectLevel.H // Уровень коррекции ошибок
+                });
+
+                // Показываем кнопку сохранения после успешной генерации
+                saveBtn.style.display = 'block';
+
+            } else {
+                // Если поле ввода пустое, выводим сообщение и очищаем QR-код
+                qrcodeDiv.innerHTML = '<p class="text-red-400 text-sm">Пожалуйста, введите текст.</p>';
+                qrcodeInstance = null; // Сбрасываем экземпляр
+                // Скрываем кнопку сохранения
+                saveBtn.style.display = 'none';
+            }
+        }
+
+
+        // Добавляем обработчик события клика на кнопку генерации
+        generateBtn.addEventListener('click', generateQrCode);
+
+        // Добавляем возможность генерации по нажатию Enter в поле ввода
+        textInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                generateQrCode(); // Вызываем функцию генерации
+            }
+        });
+
+        // Добавляем обработчик события клика на кнопку сохранения
+        saveBtn.addEventListener('click', () => {
+            // Ищем элемент canvas внутри qrcodeDiv
+            const canvas = qrcodeDiv.querySelector('canvas');
+
+            if (canvas) {
+                // Преобразуем canvas в Data URL (PNG формат)
+                const dataUrl = canvas.toDataURL("image/png");
+
+                // Создаем временную ссылку (<a>) для скачивания
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = 'qrcode.png'; // Имя файла для скачивания
+
+                // Добавляем ссылку в DOM, кликаем по ней, а затем удаляем
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                // Если canvas не найден (например, QR-код еще не сгенерирован)
+                console.error("Canvas element not found.");
+                // Можно вывести сообщение пользователю, если нужно
+            }
+        });
+
+
+         // Добавляем анимацию при загрузке страницы
+         window.onload = () => {
+             const container = document.getElementById('container');
+             container.style.animation = 'fadeIn 1s ease-out';
+         };
+    </script>
+
+</body>
+</html>

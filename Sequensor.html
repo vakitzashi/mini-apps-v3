@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Визуальный Музыкальный Секвенсор</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for centering and canvas */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1f2937; /* Dark background */
+            font-family: sans-serif;
+            color: #e5e7eb; /* Light text color */
+        }
+
+        #sequencerArea {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        canvas {
+            border: 1px solid #4b5563; /* Darker border */
+            background-color: #374151; /* Slightly lighter dark background */
+            display: block;
+            touch-action: none; /* Prevent default touch actions like scrolling */
+        }
+
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+            justify-content: center;
+            gap: 15px; /* Space between control elements */
+            max-width: 800px;
+            background-color: #374151;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .control-group label {
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #d1d5db;
+        }
+
+        .control-group input[type="range"] {
+            width: 150px; /* Fixed width for range input */
+        }
+
+        /* Style for buttons */
+        button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            color: white;
+            border: none;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .btn-green {
+            background-color: #22c55e; /* green-500 */
+        }
+
+        .btn-green:hover {
+            background-color: #16a34a; /* green-600 */
+        }
+
+        .btn-red {
+            background-color: #ef4444; /* red-500 */
+        }
+
+        .btn-red:hover {
+            background-color: #dc2626; /* red-600 */
+        }
+
+         .btn-gray {
+            background-color: #6b7280; /* gray-500 */
+        }
+
+        .btn-gray:hover {
+            background-color: #4b5563; /* gray-600 */
+        }
+
+         #tempoValue {
+            font-size: 0.9em;
+            color: #d1d5db;
+         }
+
+    </style>
+</head>
+<body>
+
+    <div id="sequencerArea">
+        <h1 class="text-2xl font-bold mb-4 text-white">Визуальный Музыкальный Секвенсор</h1>
+        <canvas id="sequencerCanvas"></canvas>
+
+        <div id="controls">
+            <button id="playStopBtn" class="btn-green">Играть</button>
+            <button id="clearBtn" class="btn-red">Очистить</button>
+
+            <div class="control-group">
+                <label for="tempoRange">Темп (BPM): <span id="tempoValue">120</span></label>
+                <input type="range" id="tempoRange" min="60" max="240" value="120">
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Get references to the canvas and context
+        const canvas = document.getElementById('sequencerCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas dimensions
+        const CANVAS_WIDTH = 600;
+        const CANVAS_HEIGHT = 300; // Wider than tall for a timeline feel
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+
+        // Get references to control elements
+        const playStopBtn = document.getElementById('playStopBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const tempoRange = document.getElementById('tempoRange');
+        const tempoValueSpan = document.getElementById('tempoValue');
+
+        // --- Sequencer Settings ---
+        const NUM_STEPS = 16; // Number of columns (beats/subdivisions)
+        const NUM_NOTES = 8; // Number of rows (different notes)
+        const CELL_WIDTH = CANVAS_WIDTH / NUM_STEPS;
+        const CELL_HEIGHT = CANVAS_HEIGHT / NUM_NOTES;
+
+        let tempo = parseInt(tempoRange.value); // Beats per minute
+        let isPlaying = false;
+        let currentStep = 0; // The current column being played
+
+        // --- Grid State ---
+        // 2D array to store the state of each cell (true if note is active, false otherwise)
+        let grid = Array(NUM_STEPS).fill(null).map(() => Array(NUM_NOTES).fill(false));
+
+        // --- Audio Context and Oscillator ---
+        let audioContext;
+        let oscillator;
+        let gainNode;
+
+        // Basic frequency mapping for notes (simple scale)
+        const noteFrequencies = [
+            261.63, // C4
+            293.66, // D4
+            329.63, // E4
+            349.23, // F4
+            391.00, // G4
+            440.00, // A4
+            493.88, // B4
+            523.25  // C5
+        ];
+
+        // --- Drawing Functions ---
+
+        function drawGrid() {
+            // Draw background
+            ctx.fillStyle = '#374151'; // Match canvas background
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // Draw grid lines
+            ctx.strokeStyle = '#4b5563'; // Darker lines
+            ctx.lineWidth = 1;
+
+            // Vertical lines (steps)
+            for (let i = 0; i <= NUM_STEPS; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * CELL_WIDTH, 0);
+                ctx.lineTo(i * CELL_WIDTH, CANVAS_HEIGHT);
+                ctx.stroke();
+            }
+
+            // Horizontal lines (notes)
+            for (let i = 0; i <= NUM_NOTES; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, i * CELL_HEIGHT);
+                ctx.lineTo(CANVAS_WIDTH, i * CELL_HEIGHT);
+                ctx.stroke();
+            }
+        }
+
+        function drawNotes() {
+            ctx.fillStyle = '#34d399'; // Green color for active notes
+            for (let step = 0; step < NUM_STEPS; step++) {
+                for (let note = 0; note < NUM_NOTES; note++) {
+                    if (grid[step][note]) {
+                        // Draw a filled rectangle for the active note
+                        ctx.fillRect(step * CELL_WIDTH + 2, note * CELL_HEIGHT + 2, CELL_WIDTH - 4, CELL_HEIGHT - 4);
+                    }
+                }
+            }
+        }
+
+        function drawPlaybackMarker() {
+            if (isPlaying) {
+                const markerX = currentStep * CELL_WIDTH;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'; // Semi-transparent white marker
+                ctx.fillRect(markerX, 0, CELL_WIDTH, CANVAS_HEIGHT);
+            }
+        }
+
+        function draw() {
+            drawGrid();
+            drawNotes();
+            drawPlaybackMarker();
+        }
+
+        // --- Audio Functions ---
+
+        function initAudio() {
+            // Create AudioContext only when user interaction occurs
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                // Create a gain node for volume control (optional)
+                gainNode = audioContext.createGain();
+                gainNode.connect(audioContext.destination);
+                gainNode.gain.value = 0.5; // Set initial volume
+            }
+        }
+
+        function playNote(frequency, duration) {
+            initAudio(); // Ensure audio context is initialized
+
+            // Create an oscillator node
+            const oscillator = audioContext.createOscillator();
+            oscillator.type = 'sine'; // Sine wave (basic synth sound)
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime); // Set frequency
+
+            // Connect oscillator to the gain node
+            oscillator.connect(gainNode);
+
+            // Start the oscillator
+            oscillator.start();
+
+            // Stop the oscillator after the duration
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        // --- Sequencer Logic ---
+
+        let nextStepTime = 0; // The audio context time when the next step should occur
+
+        function scheduleNextStep() {
+            // Calculate the duration of one step in seconds
+            const secondsPerBeat = 60 / tempo;
+            const secondsPerStep = secondsPerBeat / 4; // Assuming 4 steps per beat (16th notes)
+
+            // Ensure the next step time is in the future
+            if (nextStepTime < audioContext.currentTime) {
+                nextStepTime = audioContext.currentTime;
+            }
+
+            // Schedule the current step
+            // We schedule slightly ahead of time to ensure accuracy
+            const lookahead = 0.1; // How far ahead to look in seconds
+            const scheduleAheadTime = 0.05; // How far ahead to schedule notes
+
+            while (nextStepTime < audioContext.currentTime + lookahead) {
+                 playStep(currentStep, secondsPerStep); // Play the notes for the current step
+
+                 // Move to the next step
+                 currentStep = (currentStep + 1) % NUM_STEPS;
+
+                 // Calculate the time for the next step
+                 nextStepTime += secondsPerStep;
+            }
+
+             // Request the next scheduling check
+             if (isPlaying) {
+                 setTimeout(scheduleNextStep, scheduleAheadTime * 1000);
+             }
+        }
+
+        function playStep(stepIndex, stepDuration) {
+            const notesInStep = grid[stepIndex];
+            for (let noteIndex = 0; noteIndex < NUM_NOTES; noteIndex++) {
+                if (notesInStep[noteIndex]) {
+                    // Play the note corresponding to this row
+                    const frequency = noteFrequencies[NUM_NOTES - 1 - noteIndex]; // Invert index for higher notes at top
+                    playNote(frequency, stepDuration * 0.9); // Play note for 90% of step duration
+                }
+            }
+             draw(); // Redraw to update the playback marker
+        }
+
+
+        // --- Control Functions ---
+
+        function togglePlayback() {
+            initAudio(); // Initialize audio context on play
+
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                playStopBtn.textContent = 'Стоп';
+                playStopBtn.classList.remove('btn-green');
+                playStopBtn.classList.add('btn-red');
+
+                // Reset current step and schedule the first step
+                currentStep = 0;
+                nextStepTime = audioContext.currentTime; // Start scheduling from now
+                scheduleNextStep(); // Start the scheduling loop
+
+            } else {
+                playStopBtn.textContent = 'Играть';
+                playStopBtn.classList.remove('btn-red');
+                playStopBtn.classList.add('btn-green');
+                 // The scheduleNextStep function will stop itself when isPlaying is false
+                 draw(); // Redraw to remove the playback marker
+            }
+        }
+
+        function clearGrid() {
+            grid = Array(NUM_STEPS).fill(null).map(() => Array(NUM_NOTES).fill(false));
+            if (!isPlaying) { // Only reset step if not playing
+                currentStep = 0;
+            }
+            draw(); // Redraw the empty grid
+        }
+
+        // --- Event Listeners ---
+
+        // Play/Stop button
+        playStopBtn.addEventListener('click', togglePlayback);
+
+        // Clear button
+        clearBtn.addEventListener('click', clearGrid);
+
+        // Tempo range slider
+        tempoRange.addEventListener('input', (event) => {
+            tempo = parseInt(event.target.value);
+            tempoValueSpan.textContent = tempo;
+            // The scheduler will automatically pick up the new tempo
+        });
+
+        // Canvas interaction to toggle notes
+        canvas.addEventListener('mousedown', handleCanvasInteraction);
+        canvas.addEventListener('touchstart', handleCanvasInteraction);
+
+        function handleCanvasInteraction(event) {
+            event.preventDefault(); // Prevent default touch actions
+
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+
+            if (event.type === 'mousedown') {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            } else if (event.type === 'touchstart') {
+                if (event.touches.length === 0) return;
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            } else {
+                return; // Ignore other event types
+            }
+
+            // Get mouse or touch position relative to the canvas
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            // Calculate grid cell coordinates
+            const step = Math.floor(x / CELL_WIDTH);
+            const note = Math.floor(y / CELL_HEIGHT);
+
+            // Toggle the state of the clicked cell if within bounds
+            if (step >= 0 && step < NUM_STEPS && note >= 0 && note < NUM_NOTES) {
+                grid[step][note] = !grid[step][note];
+                draw(); // Redraw the grid immediately
+            }
+        }
+
+
+        // --- Initialization ---
+
+        window.onload = () => {
+            draw(); // Draw the initial empty grid
+        };
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сжатие Изображений</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Темный фон */
+            color: #e2e8f0; /* Светлый текст */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background-color: #2d3748; /* Более светлый темный фон для контейнера */
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            color: #4299e1; /* Синий заголовок */
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            display: none; /* Скрыть стандартный ввод файла */
+        }
+        .custom-file-upload {
+            display: inline-block;
+            background-color: #4a5568; /* Темно-серый фон кнопки */
+            color: #e2e8f0;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: background-color 0.3s ease;
+        }
+        .custom-file-upload:hover {
+            background-color: #636b7a; /* Более светлый серый при наведении */
+        }
+        canvas {
+            border: 2px solid #4a5568; /* Темно-серая рамка для холста */
+            border-radius: 5px;
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 20px;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        label {
+            margin-right: 10px;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #4a5568;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            border-radius: 5px;
+        }
+        input[type="range"]:hover {
+            opacity: 1;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4299e1; /* Синий ползунок */
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4299e1; /* Синий ползунок */
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        #qualityValue {
+            font-weight: bold;
+            color: #4299e1;
+        }
+        #saveButton {
+            background-color: #48bb78; /* Зеленая кнопка сохранения */
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #saveButton:hover {
+            background-color: #68d391; /* Более светлый зеленый при наведении */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Сжатие Изображений</h1>
+
+        <input type="file" id="imageInput" accept="image/*">
+        <label for="imageInput" class="custom-file-upload">
+            Выберите Изображение
+        </label>
+
+        <canvas id="imageCanvas"></canvas>
+
+        <div class="controls">
+            <label for="qualitySlider">Качество (0-10):</label>
+            <input type="range" id="qualitySlider" min="0" max="10" value="10">
+            <span id="qualityValue">10</span>
+        </div>
+
+        <button id="saveButton">Сохранить Изображение</button>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const imageCanvas = document.getElementById('imageCanvas');
+        const ctx = imageCanvas.getContext('2d');
+        const qualitySlider = document.getElementById('qualitySlider');
+        const qualityValueSpan = document.getElementById('qualityValue');
+        const saveButton = document.getElementById('saveButton');
+
+        let originalImage = new Image();
+
+        // Функция для отображения изображения на холсте
+        function displayImage(quality) {
+            if (!originalImage.src) return; // Ничего не делать, если изображение не загружено
+
+            // Установите размер холста равным размеру изображения для сохранения пропорций
+            imageCanvas.width = originalImage.width;
+            imageCanvas.height = originalImage.height;
+
+            // Очистить холст
+            ctx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+
+            // Нарисовать изображение на холсте
+            ctx.drawImage(originalImage, 0, 0, imageCanvas.width, imageCanvas.height);
+
+            // Обновить значение качества
+            qualityValueSpan.textContent = quality;
+        }
+
+        // Обработчик события изменения файла
+        imageInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    originalImage.onload = function() {
+                        // Отобразить изображение с начальным качеством (10)
+                        displayImage(qualitySlider.value);
+                    }
+                    originalImage.src = e.target.result;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Обработчик события изменения ползунка качества
+        qualitySlider.addEventListener('input', function() {
+            // Отобразить изображение с новым качеством
+            displayImage(this.value);
+        });
+
+        // Обработчик события нажатия кнопки сохранения
+        saveButton.addEventListener('click', function() {
+            if (!originalImage.src) {
+                alert('Пожалуйста, сначала загрузите изображение.');
+                return;
+            }
+
+            // Получить данные изображения с холста в формате JPEG с указанным качеством
+            // Преобразуем значение ползунка (0-10) в диапазон (0-1) для toDataURL
+            const quality = parseFloat(qualitySlider.value) / 10;
+            const dataURL = imageCanvas.toDataURL('image/jpeg', quality);
+
+            // Создать временную ссылку для скачивания
+            const link = document.createElement('a');
+            link.href = dataURL;
+            link.download = 'compressed_image.jpg'; // Имя файла по умолчанию
+
+            // Имитировать клик по ссылке для начала скачивания
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nespresso Dolce Gusto Timer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/tone@14.7.58/build/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Merriweather', serif;
+            background-color: #1a1a1a; /* Dark background */
+            color: #e0d9cf; /* Light text color */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Align items to the top */
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        canvas {
+            background-color: #2d2d2d; /* Darker canvas background */
+            border-radius: 1rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            margin-bottom: 1.5rem;
+            touch-action: none; /* Prevent default touch actions like scrolling */
+            flex-shrink: 0; /* Prevent canvas from shrinking */
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+            max-width: 400px; /* Limit max width for controls */
+            margin-bottom: 1.5rem;
+        }
+        .controls label {
+            font-weight: bold;
+        }
+        .controls select,
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            text-align: center;
+            width: 100%; /* Make select and buttons full width */
+            box-sizing: border-box; /* Include padding in width */
+        }
+        .controls select {
+             background-color: #6f4e37; /* Coffee brown for select */
+             color: #e0d9cf;
+             border: none;
+             appearance: none; /* Remove default dropdown arrow */
+             background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23e0d9cf%22%20d%3D%22M287%2C197.9L159.2%2C69.8c-4.7-4.7-12.3-4.7-17%2C0L5.4%2C197.9c-4.7%2C4.7-4.7%2C12.3%2C0%2C17l10.6%2C10.6c4.7%2C4.7%2C12.3%2C4.7%2C17%2C0l114.4-114.4l114.4%2C114.4c4.7%2C4.7%2C12.3%2C4.7%2C17%2C0l10.6-10.6C291.7%2C210.2%2C291.7%2C202.6%2C287%2C197.9z%22%2F%3E%3C%2Fsvg%3E');
+             background-repeat: no-repeat;
+             background-position: right 1rem top 50%;
+             background-size: 0.65em auto;
+        }
+         .controls select:hover {
+             background-color: #5a3e2e; /* Darker coffee brown on hover */
+         }
+
+        .btn-start {
+            background-color: #4CAF50; /* Green */
+            color: white;
+        }
+        .btn-start:hover {
+            background-color: #45a049;
+        }
+        .btn-start:disabled {
+            background-color: #888;
+            cursor: not-allowed;
+        }
+
+        .btn-reset {
+            background-color: #8B0000; /* Maroon */
+            color: white;
+        }
+         .btn-reset:hover {
+            background-color: #700000; /* Darker maroon on hover */
+        }
+
+
+        .btn-confirm {
+            background-color: #4CAF50; /* Green for confirmation */
+            color: white;
+            margin-top: 1rem;
+            display: none; /* Hidden by default */
+        }
+        .btn-confirm:hover {
+            background-color: #45a049;
+        }
+
+        /* Custom Volume Segments Styling */
+        .volume-segments-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 400px; /* Match controls max-width */
+            margin-bottom: 0.5rem; /* Reduced margin */
+            gap: 0.25rem; /* Small gap between segments */
+        }
+
+        .volume-segment {
+            flex-grow: 1; /* Make segments grow to fill space */
+            height: 30px; /* Fixed height for segments */
+            background-color: #4a4a4a; /* Inactive color */
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #e0d9cf; /* Text color */
+        }
+
+        .volume-segment.active {
+            background-color: #6f4e37; /* Active color (coffee brown) */
+        }
+
+        .volume-segment:hover:not(.active) {
+             background-color: #3a3a3a; /* Darker hover for inactive */
+        }
+
+
+        /* Message Box Styles */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #333;
+            color: #e0d9cf;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            text-align: center;
+            display: none; /* Hidden by default */
+        }
+
+        .message-box p {
+            margin-bottom: 1rem;
+        }
+
+        .message-box button {
+            background-color: #6f4e37;
+            color: #e0d9cf;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.3rem;
+            cursor: pointer;
+        }
+         .message-box button:hover {
+            background-color: #5a3e2e;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="timerCanvas"></canvas>
+
+    <div class="controls">
+        <label for="coffeeSelect">Выберите напиток:</label>
+        <select id="coffeeSelect">
+            <option value="">☕️ ВЫБЕРИТЕ НАПИТОК ☕️</option>
+            </select>
+
+        <button class="btn btn-start" id="startButton" disabled>СТАРТ</button>
+    </div>
+
+    <div class="volume-segments-container">
+        </div>
+     <div class="text-center text-sm text-gray-400 mt-1">
+        Выберите произвольный объем (сек)
+    </div>
+
+
+    <button class="btn btn-confirm" id="confirmButton">Подтвердить замену капсулы</button>
+
+    <div class="message-box" id="messageBox">
+        <p id="messageText"></p>
+        <button id="messageBoxButton">OK</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('timerCanvas');
+        const ctx = canvas.getContext('2d');
+        const coffeeSelect = document.getElementById('coffeeSelect');
+        const startButton = document.getElementById('startButton');
+        const confirmButton = document.getElementById('confirmButton');
+        const volumeSegmentsContainer = document.querySelector('.volume-segments-container');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const messageBoxButton = document.getElementById('messageBoxButton');
+
+        let timerInterval;
+        let startTime;
+        let totalTime = 0;
+        let timeRemaining = 0;
+        let isRunning = false;
+        let currentCoffee = null; // Stores { name, steps } for the currently selected item
+        let sequentialStep = 0; // 0-based index for the current step in a sequential timer
+
+        // Coffee definitions (times in seconds)
+        const coffeeTypes = {
+            cafeaulait: { name: 'Café au Lait: ⚫️ (180ml)', steps: [30] }, // Changed ⚪️ to ⚫️ and added ":"
+            cappuccino: { name: 'Cappuccino: ⚪️ (200ml) + ⚫️ (40ml)', steps: [29, 9] }, // Added ":"
+            chococino: { name: 'Chococino: ⚫️ (100ml) + ⚪️ (110ml)', steps: [17, 19] }, // Added ":"
+            flatwhite: { name: 'Flat White: ⚫️ (180ml)', steps: [30] } // Changed ⚪️ to ⚫️ and added ":"
+        };
+
+        // Custom volume scale times (in seconds)
+        const volumeScaleTimes = [8, 10, 15, 21, 24, 28, 38];
+
+        // Populate the coffee select dropdown
+        function populateCoffeeSelect() {
+            // Clear existing options except the first one
+            while (coffeeSelect.options.length > 1) {
+                coffeeSelect.remove(1);
+            }
+
+            for (const key in coffeeTypes) {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = coffeeTypes[key].name; // Use the updated names with symbols and colon
+                coffeeSelect.appendChild(option);
+            }
+        }
+
+        // Create and populate the volume segments
+        function createVolumeSegments() {
+            volumeSegmentsContainer.innerHTML = ''; // Clear previous segments
+            volumeScaleTimes.forEach((time, index) => {
+                const segment = document.createElement('div');
+                segment.classList.add('volume-segment');
+                segment.dataset.index = index; // Store the index
+                segment.textContent = time; // Display the time in seconds
+                volumeSegmentsContainer.appendChild(segment);
+
+                segment.addEventListener('click', () => {
+                    if (isRunning) return; // Do nothing if timer is running
+
+                    const isActive = segment.classList.contains('active');
+
+                    // Deactivate all segments
+                    document.querySelectorAll('.volume-segment').forEach(seg => {
+                        seg.classList.remove('active');
+                    });
+
+                    if (!isActive) {
+                        // Activate the clicked segment if it was not active
+                        segment.classList.add('active');
+                        const selectedTime = volumeScaleTimes[parseInt(segment.dataset.index)];
+                        currentCoffee = { name: `Произвольный объем: ${selectedTime} сек`, steps: [selectedTime] }; // Added ":"
+                        startButton.disabled = false; // Enable start button
+                        coffeeSelect.disabled = true; // Disable coffee select
+                        coffeeSelect.value = ""; // Reset coffee select value
+                    } else {
+                        // If it was active and clicked again, just deactivate and reset
+                        currentCoffee = null;
+                        startButton.disabled = true; // Disable start button
+                        coffeeSelect.disabled = false; // Enable coffee select
+                    }
+                    sequentialStep = 0; // Reset step for custom volume
+                    drawTimer(); // Update canvas display
+                });
+            });
+        }
+
+
+        // Initialize canvas size
+        function resizeCanvas() {
+            // Calculate a size that fits well, leaving space for text above and below
+            const size = Math.min(window.innerWidth * 0.8, window.innerHeight * 0.4, 350);
+            canvas.width = size;
+            canvas.height = size;
+            drawTimer(); // Redraw after resizing
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // Initial size
+
+        // Draw the timer on the canvas
+        function drawTimer() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            // Reduce radius slightly to give more space for text
+            const radius = Math.min(centerX, centerY) * 0.7;
+            const lineWidth = 20;
+
+            // Background circle
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = '#4a4a4a'; // Dark grey
+            ctx.lineWidth = lineWidth;
+            ctx.stroke();
+
+            // Timer progress arc
+            if (isRunning && totalTime > 0) {
+                const progress = (totalTime - timeRemaining) / totalTime;
+                const endAngle = Math.PI * 2 * progress - Math.PI / 2; // Start from top
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, -Math.PI / 2, endAngle);
+                ctx.strokeStyle = '#6f4e37'; // Coffee brown
+                ctx.lineWidth = lineWidth;
+                ctx.stroke();
+            }
+
+            // Time text
+            ctx.font = `${radius / 2.5}px 'Merriweather', serif`; // Slightly smaller font
+            ctx.fillStyle = '#e0d9cf'; // Light text color
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const displayTime = Math.ceil(timeRemaining);
+            ctx.fillText(displayTime, centerX, centerY);
+
+            // Coffee name/step text
+            ctx.font = `${radius / 7}px 'Merriweather', serif`; // Slightly smaller font for name/step
+            ctx.fillStyle = '#e0d9cf';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (currentCoffee) {
+                 // Position name above the circle
+                 ctx.fillText(currentCoffee.name, centerX, centerY - radius - lineWidth/2 - 10); // Adjusted Y position
+
+                 // Only show step if it's a sequential coffee and not the first step (index 0)
+                 if (currentCoffee.steps.length > 1 && sequentialStep > 0) {
+                      // Position step below the circle
+                     ctx.fillText(`Шаг ${sequentialStep + 1} из ${currentCoffee.steps.length}`, centerX, centerY + radius + lineWidth/2 + 10); // Adjusted Y position and step number
+                 } else if (currentCoffee.steps.length > 1 && sequentialStep === 0 && isRunning) {
+                     // Show "Шаг 1 из X" when the first step starts
+                      ctx.fillText(`Шаг ${sequentialStep + 1} из ${currentCoffee.steps.length}`, centerX, centerY + radius + lineWidth/2 + 10);
+                 }
+
+            } else if (!isRunning && totalTime === 0) {
+                 ctx.font = `${radius / 7}px 'Merriweather', serif`;
+                 ctx.fillStyle = '#e0d9cf';
+                 ctx.fillText("Выберите напиток", centerX, centerY - radius/4);
+                 ctx.fillText("или объем", centerX, centerY + radius/4);
+            }
+        }
+
+        // Start the timer for the current step
+        function startCurrentStep() {
+             // Use 0-based index for steps array, so sequentialStep corresponds to the index
+             if (!currentCoffee || sequentialStep >= currentCoffee.steps.length) {
+                 console.error("No steps to start or sequential step out of bounds.");
+                 return;
+             }
+
+             const duration = currentCoffee.steps[sequentialStep];
+
+             if (isRunning) {
+                 // If already running, stop it before starting the next step
+                 stopTimer();
+             }
+
+             totalTime = duration;
+             timeRemaining = duration;
+             isRunning = true;
+             startTime = Date.now();
+
+             // Change START button to RESET
+             startButton.textContent = 'СБРОС';
+             startButton.classList.remove('btn-start');
+             startButton.classList.add('btn-reset');
+             startButton.disabled = false; // Enable RESET button
+
+             coffeeSelect.disabled = true; // Disable select while running
+             document.querySelectorAll('.volume-segment').forEach(seg => seg.style.pointerEvents = 'none'); // Disable segment clicks
+             confirmButton.style.display = 'none'; // Hide confirm button when timer starts
+
+
+             timerInterval = setInterval(() => {
+                 const elapsedTime = (Date.now() - startTime) / 1000;
+                 timeRemaining = Math.max(0, totalTime - elapsedTime);
+
+                 drawTimer();
+
+                 if (timeRemaining <= 0) {
+                     clearInterval(timerInterval);
+                     isRunning = false;
+                     playNotification();
+
+                     if (sequentialStep < currentCoffee.steps.length - 1) {
+                         // More steps remaining
+                         showMessageBox("Шаг " + (sequentialStep + 1) + " завершен. Замените капсулу и нажмите ОК для следующего шага.", () => {
+                             sequentialStep++; // Move to the next step (increment index)
+                             confirmButton.style.display = 'block'; // Show confirmation for the next step
+                             // startButton.disabled = false; // Re-enable start button for the next step - Keep disabled until confirmed
+                             document.querySelectorAll('.volume-segment').forEach(seg => seg.style.pointerEvents = 'auto'); // Re-enable segment clicks
+                             // Revert button to START/disabled state while waiting for confirmation
+                             startButton.textContent = 'СТАРТ';
+                             startButton.classList.remove('btn-reset');
+                             startButton.classList.add('btn-start');
+                             startButton.disabled = true;
+                         });
+                     } else {
+                         // Last step complete
+                         showMessageBox("Готово! Приятного кофе!", () => {
+                             resetState(); // Reset everything after the last step
+                         });
+                     }
+                 }
+             }, 50); // Update every 50ms for smoother animation
+        }
+
+
+        // Stop the timer and reset button state
+        function stopTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            timeRemaining = 0;
+            totalTime = 0;
+
+            // Revert button to START state
+            startButton.textContent = 'СТАРТ';
+            startButton.classList.remove('btn-reset');
+            startButton.classList.add('btn-start');
+            startButton.disabled = false; // Enable START button
+
+            coffeeSelect.disabled = false; // Enable select
+            document.querySelectorAll('.volume-segment').forEach(seg => seg.style.pointerEvents = 'auto'); // Enable segment clicks
+            confirmButton.style.display = 'none';
+        }
+
+        // Reset state after completion or stop
+        function resetState() {
+            stopTimer(); // Ensure timer is stopped and button is reset
+            currentCoffee = null;
+            sequentialStep = 0;
+            coffeeSelect.value = ""; // Reset dropdown
+            // Deactivate all volume segments
+            document.querySelectorAll('.volume-segment').forEach(seg => {
+                seg.classList.remove('active');
+            });
+            startButton.disabled = true; // Disable start button until a choice is made
+            drawTimer();
+        }
+
+
+        // Play notification (vibration and sound)
+        function playNotification() {
+            // Vibrate (if supported)
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200]); // Vibrate pattern
+            }
+
+            // Play sound using Tone.js
+            const synth = new Tone.Synth().toDestination();
+            synth.triggerAttackRelease("C4", "8n"); // Play a C4 note for an 8th note duration
+        }
+
+        // Show message box
+        function showMessageBox(message, onConfirm = null) {
+            messageText.textContent = message;
+            messageBox.style.display = 'block';
+            messageBoxButton.onclick = () => {
+                messageBox.style.display = 'none';
+                if (onConfirm) {
+                    onConfirm();
+                }
+            };
+        }
+
+        // Handle coffee select change
+        coffeeSelect.addEventListener('change', (event) => {
+            stopTimer(); // Stop any running timer and reset button
+            const selectedKey = event.target.value;
+            if (selectedKey) {
+                currentCoffee = coffeeTypes[selectedKey];
+                startButton.disabled = false; // Enable start button
+                 // Deactivate all volume segments
+                document.querySelectorAll('.volume-segment').forEach(seg => {
+                    seg.classList.remove('active');
+                });
+                 document.querySelectorAll('.volume-segment').forEach(seg => seg.style.pointerEvents = 'none'); // Disable segment clicks
+            } else {
+                currentCoffee = null;
+                startButton.disabled = true; // Disable start button if no coffee is selected
+                document.querySelectorAll('.volume-segment').forEach(seg => seg.style.pointerEvents = 'auto'); // Enable segment clicks
+            }
+            sequentialStep = 0; // Reset step
+            drawTimer(); // Update canvas display
+        });
+
+
+        // Handle START/RESET button click
+        startButton.addEventListener('click', () => {
+            if (isRunning) {
+                // If button is currently RESET (timer is running)
+                stopTimer(); // Stop the timer
+                resetState(); // Reset the state completely
+            } else {
+                // If button is currently START (timer is not running)
+                 if (!currentCoffee) {
+                    showMessageBox("Пожалуйста, выберите напиток или произвольный объем.");
+                    return;
+                }
+                sequentialStep = 0; // Start from the first step (index 0)
+                startCurrentStep();
+            }
+        });
+
+
+        // Handle confirmation button click for sequential timers
+        confirmButton.addEventListener('click', () => {
+            // The sequentialStep has already been incremented in the previous step's onComplete
+            confirmButton.style.display = 'none'; // Hide confirmation button
+            // startButton.disabled = true; // Disable start button again while the next step runs - Handled in startCurrentStep
+            startCurrentStep(); // Start the next step
+        });
+
+
+        // Initial setup
+        populateCoffeeSelect();
+        createVolumeSegments(); // Create the volume segments
+        drawTimer(); // Initial draw
+
+    </script>
+
+</body>
+</html>

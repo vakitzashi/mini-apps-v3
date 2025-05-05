@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Физический симулятор</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Дополнительные стили, если нужны */
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            background-color: #fff;
+            display: block;
+            margin-bottom: 20px;
+            /* Сделать холст адаптивным */
+            max-width: 100%;
+            height: auto;
+        }
+        .controls {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .control-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .control-group input[type="range"],
+        .control-group input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 class="text-2xl font-bold mb-4">Визуализатор физических симуляций</h1>
+
+    <canvas id="physicsCanvas"></canvas>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="numParticles">Количество частиц:</label>
+            <input type="number" id="numParticles" value="50" min="1" max="500">
+        </div>
+        <div class="control-group">
+            <label for="gravity">Гравитация (Y):</label>
+            <input type="range" id="gravity" value="0.5" min="-1" max="1" step="0.01">
+            <span id="gravityValue">0.5</span>
+        </div>
+         <div class="control-group">
+            <label for="gravityX">Гравитация (X):</label>
+            <input type="range" id="gravityX" value="0" min="-1" max="1" step="0.01">
+            <span id="gravityXValue">0</span>
+        </div>
+        <div class="control-group">
+            <label for="particleSize">Размер частиц:</label>
+            <input type="range" id="particleSize" value="5" min="1" max="20">
+            <span id="particleSizeValue">5</span>
+        </div>
+        <div class="control-group">
+            <label for="restitution">Коэффициент восстановления:</label>
+            <input type="range" id="restitution" value="0.8" min="0" max="1" step="0.01">
+            <span id="restitutionValue">0.8</span>
+        </div>
+         <div class="control-group">
+            <label for="collisionIterations">Итераций коллизий:</label>
+            <input type="number" id="collisionIterations" value="5" min="1" max="20">
+        </div>
+        <div class="control-group">
+            <button id="resetSimulation" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                Перезапустить симуляцию
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Получаем элементы DOM
+        const canvas = document.getElementById('physicsCanvas');
+        const ctx = canvas.getContext('2d');
+        const numParticlesInput = document.getElementById('numParticles');
+        const gravityInput = document.getElementById('gravity');
+        const gravityXInput = document.getElementById('gravityX');
+        const particleSizeInput = document.getElementById('particleSize');
+        const restitutionInput = document.getElementById('restitution');
+        const collisionIterationsInput = document.getElementById('collisionIterations');
+        const gravityValueSpan = document.getElementById('gravityValue');
+        const gravityXValueSpan = document.getElementById('gravityXValue');
+        const particleSizeValueSpan = document.getElementById('particleSizeValue');
+        const restitutionValueSpan = document.getElementById('restitutionValue');
+        const resetSimulationButton = document.getElementById('resetSimulation');
+
+        // Параметры симуляции по умолчанию
+        let numParticles = parseInt(numParticlesInput.value);
+        let gravityY = parseFloat(gravityInput.value);
+        let gravityX = parseFloat(gravityXInput.value);
+        let particleSize = parseInt(particleSizeInput.value);
+        let restitution = parseFloat(restitutionInput.value);
+        let collisionIterations = parseInt(collisionIterationsInput.value);
+        let particles = [];
+
+        // Класс для представления частицы
+        class Particle {
+            constructor(x, y, radius, color) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.vx = (Math.random() - 0.5) * 5; // Случайная начальная скорость по X
+                this.vy = (Math.random() - 0.5) * 5; // Случайная начальная скорость по Y
+                this.mass = 1; // Упрощенная масса
+            }
+
+            // Обновление позиции частицы
+            update() {
+                this.vx += gravityX; // Применение гравитации по X
+                this.vy += gravityY; // Применение гравитации по Y
+
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+
+            // Отрисовка частицы
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        // Инициализация симуляции
+        function initSimulation() {
+            particles = [];
+            for (let i = 0; i < numParticles; i++) {
+                // Размещаем частицы случайным образом в пределах холста
+                const radius = particleSize;
+                const x = Math.random() * (canvas.width - 2 * radius) + radius;
+                const y = Math.random() * (canvas.height - 2 * radius) + radius;
+                const color = `hsl(${Math.random() * 360}, 70%, 50%)`; // Случайный цвет
+                particles.push(new Particle(x, y, radius, color));
+            }
+        }
+
+        // Обработка столкновений частиц друг с другом
+        function handleParticleCollisions() {
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const p1 = particles[i];
+                    const p2 = particles[j];
+
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    // Если частицы пересекаются
+                    if (distance < p1.radius + p2.radius) {
+                        // Вектор нормали столкновения
+                        const normalX = dx / distance;
+                        const normalY = dy / distance;
+
+                        // Перекрытие
+                        const overlap = (p1.radius + p2.radius) - distance;
+
+                        // Сдвигаем частицы, чтобы они не пересекались
+                        const separationX = normalX * (overlap / 2);
+                        const separationY = normalY * (overlap / 2);
+
+                        p1.x -= separationX;
+                        p1.y -= separationY;
+                        p2.x += separationX;
+                        p2.y += separationY;
+
+                        // Относительная скорость
+                        const relativeVx = p2.vx - p1.vx;
+                        const relativeVy = p2.vy - p1.vy;
+
+                        // Проекция относительной скорости на вектор нормали
+                        const dotProduct = relativeVx * normalX + relativeVy * normalY;
+
+                        // Только если частицы движутся навстречу друг другу
+                        if (dotProduct < 0) {
+                            // Импульс
+                            const impulse = (-(1 + restitution) * dotProduct) / (p1.mass + p2.mass);
+
+                            // Обновление скоростей
+                            p1.vx -= impulse * p1.mass * normalX;
+                            p1.vy -= impulse * p1.mass * normalY;
+                            p2.vx += impulse * p2.mass * normalX;
+                            p2.vy += impulse * p2.mass * normalY;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        // Обработка столкновений частиц со стенами холста
+        function handleWallCollisions() {
+            particles.forEach(particle => {
+                // Столкновение с правой стеной
+                if (particle.x + particle.radius > canvas.width) {
+                    particle.x = canvas.width - particle.radius;
+                    particle.vx = -particle.vx * restitution; // Отскок с учетом коэффициента восстановления
+                }
+                // Столкновение с левой стеной
+                if (particle.x - particle.radius < 0) {
+                    particle.x = particle.radius;
+                    particle.vx = -particle.vx * restitution;
+                }
+                // Столкновение с нижней стеной
+                if (particle.y + particle.radius > canvas.height) {
+                    particle.y = canvas.height - particle.radius;
+                    particle.vy = -particle.vy * restitution;
+                }
+                // Столкновение с верхней стеной
+                if (particle.y - particle.radius < 0) {
+                    particle.y = particle.radius;
+                    particle.vy = -particle.vy * restitution;
+                }
+            });
+        }
+
+        // Основной цикл симуляции
+        function animate() {
+            // Очистка холста
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Обновление позиций частиц
+            particles.forEach(particle => particle.update());
+
+            // Обработка столкновений (несколько итераций для лучшей стабильности)
+            for (let i = 0; i < collisionIterations; i++) {
+                 handleParticleCollisions();
+            }
+
+
+            // Обработка столкновений со стенами
+            handleWallCollisions();
+
+            // Отрисовка частиц
+            particles.forEach(particle => particle.draw());
+
+            // Запрос следующего кадра анимации
+            requestAnimationFrame(animate);
+        }
+
+        // Обновление размеров холста при изменении размера окна
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth; // Ширина равна ширине родителя
+            canvas.height = window.innerHeight * 0.6; // Высота 60% от высоты окна
+            initSimulation(); // Переинициализация симуляции при изменении размера
+        }
+
+        // Обработчики событий для элементов управления
+        numParticlesInput.addEventListener('change', (e) => {
+            numParticles = parseInt(e.target.value);
+            initSimulation(); // Перезапуск симуляции с новым количеством частиц
+        });
+
+        gravityInput.addEventListener('input', (e) => {
+            gravityY = parseFloat(e.target.value);
+            gravityValueSpan.textContent = gravityY.toFixed(2);
+        });
+
+         gravityXInput.addEventListener('input', (e) => {
+            gravityX = parseFloat(e.target.value);
+            gravityXValueSpan.textContent = gravityX.toFixed(2);
+        });
+
+        particleSizeInput.addEventListener('input', (e) => {
+            particleSize = parseInt(e.target.value);
+            particleSizeValueSpan.textContent = particleSize;
+            // Обновляем размер существующих частиц (опционально, или только при перезапуске)
+             particles.forEach(p => p.radius = particleSize);
+        });
+
+        restitutionInput.addEventListener('input', (e) => {
+            restitution = parseFloat(e.target.value);
+            restitutionValueSpan.textContent = restitution.toFixed(2);
+        });
+
+        collisionIterationsInput.addEventListener('change', (e) => {
+            collisionIterations = parseInt(e.target.value);
+        });
+
+        resetSimulationButton.addEventListener('click', () => {
+            initSimulation(); // Перезапуск симуляции
+        });
+
+
+        // Инициализация и запуск
+        window.addEventListener('load', () => {
+             resizeCanvas(); // Устанавливаем начальный размер холста
+             animate(); // Запускаем цикл анимации
+        });
+
+        window.addEventListener('resize', resizeCanvas); // Обработка изменения размера окна
+
+    </script>
+
+</body>
+</html>
