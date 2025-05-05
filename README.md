@@ -29,52 +29,55 @@
 ### 1. **Compressor**
 Простое приложение для сжатия изображений с целью уменьшения их веса. При сжатии более чем на 5 пунктов качество изображения значительно ухудшается, но до 5 пунктов оно остаётся приемлемым.
 
-![Compressor 1](img)
-![Compressor 2](img)
-![Compressor 3](img)
-![Compressor 4](img)
+![Compressor 1](https://github.com/vakitzashi/mini-apps-v3/blob/main/compress1.png)
+
+Результат компрессии на 5 пунктов:
+
+![Compressor 2](https://github.com/vakitzashi/mini-apps-v3/blob/main/compressed.png)
 
 ---
 
 ### 2. **Music Visualizator**
 Пользователь загружает аудио-файл, и приложение создаёт визуализацию в виде столбчатой частотной диаграммы в реальном времени. Такое же приложение можно реализовать с использованием звука с микрофона.
 
-![Music Visualizator](img)
+![Music Visualizator](https://github.com/vakitzashi/mini-apps-v3/blob/main/visual1.png)
 
 ---
 
 ### 3. **Sequensor**
 Простой музыкальный loop-пад, который зацикленно воспроизводит выбранные пользователем ноты в заданном BPM.
 
-![Sequensor](img)
+![Sequensor](https://github.com/vakitzashi/mini-apps-v3/blob/main/seq1.png)
 
 ---
 
 ### 4. **QR-code Generator**
 Приложение генерирует QR-код из текста, введённого в поле ввода. Используется внешняя библиотека. Есть функция сохранения сгенерированного QR-кода.
 
-![QR-code Generator](img)
+![QR-code Generator](https://github.com/vakitzashi/mini-apps-v3/blob/main/QRgen1.png)
 
 ---
 
 ### 5. **Gravitation**
 Приложение для демонстрации гравитационного воздействия на частицы. Не рекомендуется генерировать более 5000 частиц. Пользователь может изменять гравитацию в реальном времени и наблюдать её влияние на частицы.
 
-![Gravitation](img)
+![Gravitation](https://github.com/vakitzashi/mini-apps-v3/blob/main/grav1.png)
 
 ---
 
 ### 6. **Dolce Gusto Timers**
 Приложение для владельцев кофеварки Dolce Gusto без функции отсчёта времени. Помогает выполнить точный пролив для приготовления кофе. Дополнительные сорта можно легко добавить вручную через код (в коде оставлены пояснения) или попросить ИИ сделать это. По окончании приготовления приложение издаёт звук и воспроизводит вибрацию смартфона.
 
-![Dolce Gusto Timers](img)
+![Dolce Gusto Timers](https://github.com/vakitzashi/mini-apps-v3/blob/main/dgt1.png)
+
+![Dolce Gusto Timers2](https://github.com/vakitzashi/mini-apps-v3/blob/main/dgt2.png)
 
 ---
 
 ### 7. **Wallpaper Generator**
 Генератор минималистичных обоев. Пользователь может выбрать от 1 до 5 разных цветов на спектре и применить один из 17 типов смешения этих цветов. Есть возможность сохранить полученное изображение.
 
-![Wallpaper Generator](img)
+![Wallpaper Generator](https://github.com/vakitzashi/mini-apps-v3/blob/main/wall1.jpg)
 
 ---
 
